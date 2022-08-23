@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { AuthService } from '../../services/auth.service';
 import { Router } from '@angular/router';
 import {
@@ -8,6 +8,12 @@ import {
   Validators,
 } from '@angular/forms';
 import Swal from 'sweetalert2';
+import { Store } from '@ngrx/store';
+import { AppState } from 'src/app/app.reducer';
+
+import * as actions from '../../shared/ui.actions';
+
+import { Subscription } from 'rxjs';
 
 interface LoginForms {
   email: FormControl<string>;
@@ -19,32 +25,39 @@ interface LoginForms {
   templateUrl: './login.component.html',
   styles: [],
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, OnDestroy {
   loginFormGroup!: FormGroup<LoginForms>;
+
+  isLoading = false;
+  uiSubscription: Subscription;
 
   constructor(
     private formBuilder: FormBuilder,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private store: Store<AppState>
   ) {}
 
   ngOnInit(): void {
     this.createForm();
+
+    this.uiSubscription = this.store
+      .select('ui')
+      .subscribe((ui) => (this.isLoading = ui.isLoading));
+  }
+
+  ngOnDestroy(): void {
+    this.uiSubscription.unsubscribe();
   }
 
   public loggin() {
-    Swal.fire({
-      title: 'Loading!',
-      didOpen: () => {
-        Swal.showLoading();
-      },
-    });
+    this.store.dispatch(actions.isLoading());
 
     const { email, password } = this.loginFormGroup.value;
     this.authService
       .loggin(email!, password!)
       .then(() => {
-        Swal.close();
+        this.store.dispatch(actions.stopLoading());
         this.router.navigate(['/']);
       })
       .catch((err) => {
